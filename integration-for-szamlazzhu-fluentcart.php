@@ -324,8 +324,7 @@ function get_pdf_path($invoice_number) {
             ];
             echo '<select name="szamlazz_hu_invoice_language">';
             foreach ($languages as $code => $name) {
-                $selected = ($code == $value) ? 'selected' : '';
-                echo '<option value="' . \esc_attr($code) . '" ' . $selected . '>' . \esc_html($name) . '</option>';
+                echo '<option value="' . \esc_attr($code) . '" ' . ($code == $value) ? 'selected>' : '>' . \esc_html($name) . '</option>';
             }
             echo '</select>';
         },
@@ -344,8 +343,7 @@ function get_pdf_path($invoice_number) {
             ];
             echo '<select name="szamlazz_hu_invoice_type">';
             foreach ($types as $type_value => $type_name) {
-                $selected = ($type_value == $value) ? 'selected' : '';
-                echo '<option value="' . \esc_attr($type_value) . '" ' . $selected . '>' . \esc_html($type_name) . '</option>';
+                echo '<option value="' . \esc_attr($type_value) . '" ' . ($type_value == $value) ? 'selected>' : '>' . \esc_html($type_name) . '</option>';
             }
             echo '</select>';
         },
