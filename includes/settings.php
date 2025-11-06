@@ -189,8 +189,7 @@ if (!\defined('ABSPATH')) {
             $options = [0, 5, 18, 27];
             echo '<select name="szamlazz_hu_shipping_vat">';
             foreach ($options as $option) {
-                $selected = ($option == $value) ? 'selected' : '';
-                echo '<option value="' . \esc_attr($option) . '" ' . $selected . '>' . \esc_html($option) . '%</option>';
+                echo '<option value="' . \esc_attr($option) . '" ' . ($option == $value) ? 'selected>' : '>' . \esc_html($option) . '%</option>';
             }
             echo '</select>';
         },
