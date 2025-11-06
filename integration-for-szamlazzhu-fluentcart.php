@@ -134,6 +134,11 @@ function clear_cache() {
     $cache_path = get_cache_path();
     
     if ($cache_path && file_exists($cache_path)) {
+        // Initialize WP_Filesystem
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        WP_Filesystem();
+        global $wp_filesystem;
+        
         // Recursively delete all files and folders
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($cache_path, \RecursiveDirectoryIterator::SKIP_DOTS),
@@ -142,14 +147,14 @@ function clear_cache() {
         
         foreach ($iterator as $file) {
             if ($file->isDir()) {
-                rmdir($file->getPathname());
+                $wp_filesystem->rmdir($file->getPathname());
             } else {
-                unlink($file->getPathname());
+                $wp_filesystem->delete($file->getPathname());
             }
         }
         
         // Remove the main directory
-        rmdir($cache_path);
+        $wp_filesystem->rmdir($cache_path);
     }
     
     // Delete the suffix option to regenerate a new one
