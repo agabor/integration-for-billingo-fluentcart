@@ -80,8 +80,7 @@ function get_taxpayer_data($order_id, $api_key, $vat_number) {
  * @param object $order The order object
  * @param string $api_key The API key
  * @param string|null $vat_number The VAT number
- * @return array The buyer data array
- * @throws \Exception If billing address is not found
+ * @return array|\WP_Error The buyer data array or WP_Error on failure
  */
 function create_buyer_data($order, $api_key, $vat_number = null) {
     $order_id = $order->id;
@@ -89,7 +88,7 @@ function create_buyer_data($order, $api_key, $vat_number = null) {
     // Get billing address
     $billing = $order->billing_address;
     if (!$billing) {
-        throw new \Exception("No billing address found for order " . absint($order_id));
+        return new \WP_Error('no_billing_address', "No billing address found for order " . absint($order_id));
     }
     
     // Initialize with billing address defaults
@@ -170,15 +169,14 @@ function create_seller_data($order_id) {
  * Build order items data array
  * 
  * @param object $order The order object
- * @return array The items data array
- * @throws \Exception If no items found
+ * @return array|\WP_Error The items data array or WP_Error on failure
  */
 function build_order_items_data($order) {
     $order_id = $order->id;
     $items = OrderItem::where('order_id', $order_id)->get();
     
     if ($items->isEmpty()) {
-        throw new \Exception("No items found for order " . absint($order_id));
+        return new \WP_Error('no_items', "No items found for order " . absint($order_id));
     }
     
     // Get quantity unit from settings
@@ -311,6 +309,9 @@ function generate_invoice($order) {
     
     // Create buyer data with taxpayer data if available
     $buyer_data = create_buyer_data($order, $api_key, $vat_number);
+    if (\is_wp_error($buyer_data)) {
+        return $buyer_data;
+    }
     
     // Create seller data with email settings
     $seller_data = create_seller_data($order_id);
@@ -327,6 +328,9 @@ function generate_invoice($order) {
     
     // Build order items data
     $items_data = build_order_items_data($order);
+    if (\is_wp_error($items_data)) {
+        return $items_data;
+    }
     
     // Build invoice header data
     $today = date('Y-m-d');
@@ -379,50 +383,49 @@ function create_invoice($order, $main_order = null) {
         $main_order = $order;
     $main_order_id = $main_order->id;
     
-    try {
-        write_log($order_id, 'Invoice creation triggered', 'Order ID', $order_id, 'Main order ID', $main_order_id);
+    write_log($order_id, 'Invoice creation triggered', 'Order ID', $order_id, 'Main order ID', $main_order_id);
+    
+    // Initialize paths and ensure folders exist
+    init_paths();
+    
+    // Check if invoice already exists
+    $existing = get_invoice_by_order_id($order_id);
+    if ($existing) {
+        $message = sprintf('Invoice already exists: %s', $existing->invoice_number);
+        write_log($order_id, 'Invoice already exists', $existing->invoice_number);
+        log_activity($order_id, true, $message);
+        return;
+    }
+    
+    $result = generate_invoice($main_order);
+    
+    // Check for errors
+    if (\is_wp_error($result)) {
+        $error_message = 'Failed to generate invoice: ' . $result->get_error_message();
+        write_log($order_id, 'Invoice generation failed', 'Error', $error_message);
+        log_activity($order_id, false, $error_message);
+        return;
+    }
+    
+    // Check if invoice was created successfully
+    if (!empty($result['success']) && !empty($result['invoice_number'])) {
+        $invoice_number = $result['invoice_number'];
         
-        // Initialize paths and ensure folders exist
-        init_paths();
+        write_log($order_id, 'Invoice generated successfully', 'Invoice number', $invoice_number);
         
-        // Check if invoice already exists
-        $existing = get_invoice_by_order_id($order_id);
-        if ($existing) {
-            $message = sprintf('Invoice already exists: %s', $existing->invoice_number);
-            write_log($order_id, 'Invoice already exists', $existing->invoice_number);
-            log_activity($order_id, true, $message);
-            return;
-        }
+        // Save to database - create a compatible result object
+        $result_obj = (object) array(
+            'invoice_number' => $invoice_number,
+            'pdf_data' => $result['pdf_data'] ?? null,
+        );
+        save_invoice($order_id, $result_obj);
         
-        $result = generate_invoice($main_order);
-        
-        // Check for errors
-        if (\is_wp_error($result)) {
-            throw new \Exception('Failed to generate invoice: ' . $result->get_error_message());
-        }
-        
-        // Check if invoice was created successfully
-        if (!empty($result['success']) && !empty($result['invoice_number'])) {
-            $invoice_number = $result['invoice_number'];
-            
-            write_log($order_id, 'Invoice generated successfully', 'Invoice number', $invoice_number);
-            
-            // Save to database - create a compatible result object
-            $result_obj = (object) array(
-                'invoice_number' => $invoice_number,
-                'pdf_data' => $result['pdf_data'] ?? null,
-            );
-            save_invoice($order_id, $result_obj);
-            
-            // Log success
-            $message = sprintf('Számlázz.hu invoice created: %s', $invoice_number);
-            log_activity($order_id, true, $message);
-        } else {
-            throw new \Exception('Failed to generate invoice: Unknown error');
-        }
-        
-    } catch (\Exception $e) {
-        write_log($order_id, 'Invoice generation failed', 'Error', $e->getMessage());
-        log_activity($order_id, false, $e->getMessage());
+        // Log success
+        $message = sprintf('Számlázz.hu invoice created: %s', $invoice_number);
+        log_activity($order_id, true, $message);
+    } else {
+        $error_message = 'Failed to generate invoice: Unknown error';
+        write_log($order_id, 'Invoice generation failed', 'Error', $error_message);
+        log_activity($order_id, false, $error_message);
     }
 }
