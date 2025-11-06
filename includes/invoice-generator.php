@@ -16,21 +16,6 @@ use FluentCart\App\Models\Activity;
 use FluentCart\App\Models\Cart;
 use FluentCart\App\Models\OrderItem;
 
-/**
- * Get and validate API key from settings
- * 
- * @return string The API key
- * @throws \Exception If API key is not configured
- */
-function get_api_key() {
-    $api_key = \get_option('szamlazz_hu_agent_api_key', '');
-    
-    if (empty($api_key)) {
-        throw new \Exception('Agent API Key is not configured. Please configure it in Settings > Számlázz.hu');
-    }
-    
-    return $api_key;
-}
 
 /**
  * Get VAT number from checkout data
@@ -303,7 +288,6 @@ function log_activity($order_id, $success, $message) {
  * 
  * @param object $order The order object
  * @return array|WP_Error The invoice generation result
- * @throws \Exception If API key is not configured
  */
 function generate_invoice($order) {
     $order_id = $order->id;
@@ -311,7 +295,11 @@ function generate_invoice($order) {
     write_log($order_id, 'Starting invoice generation', 'Order ID', $order_id, 'Currency', $order->currency);
     
     // Get and validate API key
-    $api_key = get_api_key();
+    $api_key = \get_option('szamlazz_hu_agent_api_key', '');
+    
+    if (empty($api_key)) {
+        return new \WP_Error('api_error', 'API Key not configured.');
+    }
     
     // Get VAT number from checkout data
     $vat_number = get_vat_number($order_id);
