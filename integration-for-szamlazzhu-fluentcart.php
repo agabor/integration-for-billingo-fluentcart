@@ -239,7 +239,7 @@ function get_pdf_path($invoice_number) {
                 }
                 
                 // PDF not in cache, fetch from API using WordPress HTTP API
-                $result = fetch_invoice_pdf($api_key, $invoice_record->invoice_number);
+                $result = fetch_invoice_pdf($order_id, $api_key, $invoice_record->invoice_number);
                 
                 // Check if fetch was successful
                 if (!is_wp_error($result) && isset($result['success']) && $result['success']) {
