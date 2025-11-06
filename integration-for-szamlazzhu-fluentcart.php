@@ -1006,11 +1006,16 @@ function create_invoice($order, $main_order = null) {
                 $cached_pdf_path = get_pdf_path($invoice_record->invoice_number);
                 
                 if ($cached_pdf_path && \file_exists($cached_pdf_path)) {
+                    // Initialize WP_Filesystem
+                    require_once(ABSPATH . 'wp-admin/includes/file.php');
+                    WP_Filesystem();
+                    global $wp_filesystem;
+                    
                     // Serve from cache
                     \header('Content-Type: application/pdf');
                     \header('Content-Disposition: attachment; filename="' . \basename($cached_pdf_path) . '"');
                     \header('Content-Length: ' . \filesize($cached_pdf_path));
-                    \readfile($cached_pdf_path);
+                    echo $wp_filesystem->get_contents($cached_pdf_path);
                     exit;
                 }
                 
