@@ -165,66 +165,38 @@ function generate_invoice_api($order_id, $api_key, $params) {
         return create_error($order_id, 'api_error', 'API returned error code', $response_code, $response_body);
     }
     
-    // Parse response based on content type
-    $content_type = $response_headers['content-type'] ?? '';
-    
-    if (strpos($content_type, 'application/pdf') !== false) {
-        // Response is PDF (text mode response)
-        return create_error($order_id, 'api_error', 'Unexpected PDF response. XML response expected.');
-    } elseif (strpos($content_type, 'text/xml') !== false || strpos($content_type, 'application/xml') !== false) {
-        // Response is XML
-        try {
-            $xml = new \SimpleXMLElement($response_body);
-            
-            // Check for errors
-            $success = (string)$xml->sikeres;
-            $error_code = (string)$xml->hibakod;
-            $error_message = (string)$xml->hibauzenet;
-            
-            if ($success === 'false' || !empty($error_code)) {
-                return create_error($order_id, 'api_error', sprintf('Invoice generation failed [%s]', $error_code), $error_message);
-            }
-            
-            // Extract invoice data
-            $result = array(
-                'success' => true,
-                'invoice_number' => (string)$xml->szamlaszam,
-                'invoice_net' => (string)$xml->szamlanetto,
-                'invoice_gross' => (string)$xml->szamlabrutto,
-                'buyer_account_id' => (string)$xml->vevoifiokurl,
-                'pdf_data' => null,
-            );
-            
-            // Extract PDF if present
-            if (isset($xml->pdf) && !empty($xml->pdf)) {
-                $result['pdf_data'] = base64_decode((string)$xml->pdf);
-            }
-            
-            return $result;
-            
-        } catch (\Exception $e) {
-            return create_error($order_id, 'parse_error', 'Failed to parse XML response', $e->getMessage());
-        }
-    } else {
-        // Unknown response type, try to parse as text error
-        // Save response to file for debugging
-        $cache_path = \SzamlazzHuFluentCart\get_cache_path();
-        if ($cache_path) {
-            $error_dir = $cache_path . DIRECTORY_SEPARATOR . 'errors';
-            if (!file_exists($error_dir)) {
-                wp_mkdir_p($error_dir);
-            }
-            $filename = $error_dir . DIRECTORY_SEPARATOR . 'unknown_response_' . $order_id . '_' . time() . '.txt';
-            
-            // Initialize WP_Filesystem
-            require_once(ABSPATH . 'wp-admin/includes/file.php');
-            WP_Filesystem();
-            global $wp_filesystem;
-            
-            $wp_filesystem->put_contents($filename, $response_body, FS_CHMOD_FILE);
+    // Response is XML
+    try {
+        $xml = new \SimpleXMLElement($response_body);
+        
+        // Check for errors
+        $success = (string)$xml->sikeres;
+        $error_code = (string)$xml->hibakod;
+        $error_message = (string)$xml->hibauzenet;
+        
+        if ($success === 'false' || !empty($error_code)) {
+            return create_error($order_id, 'api_error', sprintf('Invoice generation failed [%s]', $error_code), $error_message);
         }
         
-        return create_error($order_id, 'api_error', 'Unknown response type', $content_type, substr($response_body, 0, 200));
+        // Extract invoice data
+        $result = array(
+            'success' => true,
+            'invoice_number' => (string)$xml->szamlaszam,
+            'invoice_net' => (string)$xml->szamlanetto,
+            'invoice_gross' => (string)$xml->szamlabrutto,
+            'buyer_account_id' => (string)$xml->vevoifiokurl,
+            'pdf_data' => null,
+        );
+        
+        // Extract PDF if present
+        if (isset($xml->pdf) && !empty($xml->pdf)) {
+            $result['pdf_data'] = base64_decode((string)$xml->pdf);
+        }
+        
+        return $result;
+        
+    } catch (\Exception $e) {
+        return create_error($order_id, 'parse_error', 'Failed to parse XML response', $e->getMessage());
     }
 }
 
