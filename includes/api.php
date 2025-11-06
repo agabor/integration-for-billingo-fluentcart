@@ -132,13 +132,24 @@ function generate_invoice_api($order_id, $api_key, $params) {
     // Build XML request
     $xml_string = build_invoice_xml($params);
     
+    // Create multipart/form-data request body
+    $boundary = wp_generate_password(24, false);
+    $body = '';
+    
+    // Add XML file as action-xmlagentxmlfile
+    $body .= "--{$boundary}\r\n";
+    $body .= 'Content-Disposition: form-data; name="action-xmlagentxmlfile"; filename="request.xml"' . "\r\n";
+    $body .= "Content-Type: application/xml\r\n\r\n";
+    $body .= $xml_string . "\r\n";
+    $body .= "--{$boundary}--\r\n";
+    
     // Send request to Számlázz.hu API
     $response = \wp_remote_post('https://www.szamlazz.hu/szamla/', array(
         'timeout' => 30,
         'headers' => array(
-            'Content-Type' => 'text/xml; charset=UTF-8',
+            'Content-Type' => 'multipart/form-data; boundary=' . $boundary,
         ),
-        'body' => $xml_string,
+        'body' => $body,
     ));
     
     // Check for HTTP errors
