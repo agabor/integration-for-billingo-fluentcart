@@ -26,17 +26,8 @@ require __DIR__ . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'sett
 
 use \SzamlaAgent\SzamlaAgentAPI;
 use \SzamlaAgent\SzamlaAgentUtil;
-use \SzamlaAgent\Buyer;
-use \SzamlaAgent\Seller;
-use \SzamlaAgent\Language;
-use \SzamlaAgent\Document\Invoice\Invoice;
-use \SzamlaAgent\Item\InvoiceItem;
 
-use FluentCart\App\Models\Activity;
-use FluentCart\App\Models\Cart;
 use FluentCart\App\Models\Order;
-use FluentCart\App\Models\OrderItem;
-use FluentCart\App\Models\TaxRate;
 
 /**
  * Initialize Szamlazz.hu base path and ensure required folders exist
