@@ -19,6 +19,7 @@ if (!\defined('ABSPATH')) {
 }
 
 require __DIR__ . DIRECTORY_SEPARATOR .'autoload.php';
+require __DIR__ . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'database.php';
 
 use \SzamlaAgent\SzamlaAgentAPI;
 use \SzamlaAgent\SzamlaAgentUtil;
@@ -186,25 +187,7 @@ function get_pdf_path($invoice_number) {
 /**
  * Create database table on plugin activation
  */
-\register_activation_hook(__FILE__, function() {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'szamlazz_invoices';
-    $charset_collate = $wpdb->get_charset_collate();
-
-    $sql = "CREATE TABLE IF NOT EXISTS $table_name (
-        id bigint(20) NOT NULL AUTO_INCREMENT,
-        order_id bigint(20) NOT NULL,
-        invoice_number varchar(255) NOT NULL,
-        invoice_id varchar(255) DEFAULT NULL,
-        created_at datetime DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        UNIQUE KEY order_id (order_id),
-        KEY invoice_number (invoice_number)
-    ) $charset_collate;";
-
-    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-    dbDelta($sql);
-});
+\register_activation_hook(__FILE__, __NAMESPACE__ . '\\create_invoices_table');
 
 /**
  * Register admin menu
@@ -494,19 +477,6 @@ function settings_page() {
     $order = $data['order'];
     create_invoice($order);
 }, 10, 1);
-
-/**
- * Check if an invoice already exists for the given order
- */
-function check_existing_invoice($order_id) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'szamlazz_invoices';
-    
-    return $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $table_name WHERE order_id = %d",
-        $order_id
-    ));
-}
 
 /**
  * Get and validate API key from settings
@@ -800,24 +770,6 @@ function add_order_items($invoice, $order) {
 }
 
 /**
- * Save invoice data to database
- */
-function save_invoice($order_id, $result) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'szamlazz_invoices';
-    
-    $wpdb->insert(
-        $table_name,
-        [
-            'order_id' => $order_id,
-            'invoice_number' => $result->getDocumentNumber(),
-            'invoice_id' => $result->getDataObj()->invoiceId ?? null
-        ],
-        ['%d', '%s', '%s']
-    );
-}
-
-/**
  * Log invoice activity
  */
 function log_activity($order_id, $success, $message) {
@@ -935,7 +887,7 @@ function create_invoice($order, $main_order = null) {
         init_paths();
         
         // Check if invoice already exists
-        $existing = check_existing_invoice($order_id);
+        $existing = get_invoice_by_order_id($order_id);
         if ($existing) {
             $message = sprintf('Invoice already exists: %s', $existing->invoice_number);
             debug_log($order_id, 'Invoice already exists', $existing->invoice_number);
@@ -981,7 +933,6 @@ function create_invoice($order, $main_order = null) {
             return;
 
         $order_id = Order::where('uuid', $order_hash)->value('id');
-        global $wpdb;
     
         try {
             // Initialize paths and ensure folders exist
@@ -995,11 +946,7 @@ function create_invoice($order, $main_order = null) {
             }
             
             // Check if invoice exists in database
-            $table_name = $wpdb->prefix . 'szamlazz_invoices';
-            $invoice_record = $wpdb->get_row($wpdb->prepare(
-                "SELECT * FROM $table_name WHERE order_id = %d",
-                $order_id
-            ));
+            $invoice_record = get_invoice_by_order_id($order_id);
             
             if ($invoice_record) {
                 // Check if PDF exists in cache
