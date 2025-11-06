@@ -101,9 +101,9 @@ function build_invoice_xml($params) {
         $tetel->addChild('mennyisegiEgyseg', $item['unit']);
         $tetel->addChild('nettoEgysegar', $item['unit_price']);
         $tetel->addChild('afakulcs', $item['vat_rate']);
-        $tetel->addChild('netto', $item['net_price']);
-        $tetel->addChild('afa', $item['vat_amount']);
-        $tetel->addChild('brutto', $item['gross_amount']);
+        $tetel->addChild('nettoErtek', $item['net_price']);
+        $tetel->addChild('afaErtek', $item['vat_amount']);
+        $tetel->addChild('bruttoErtek', $item['gross_amount']);
         
         if (!empty($item['comment'])) {
             $tetel->addChild('megjegyzes', $item['comment']);
