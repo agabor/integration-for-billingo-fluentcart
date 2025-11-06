@@ -957,7 +957,6 @@ function create_invoice($order, $main_order = null) {
         
     } catch (\Exception $e) {
         debug_log($order_id, 'Invoice generation failed', 'Error', $e->getMessage());
-        \file_put_contents('/var/www/error.txt', \var_export($e, true));
         log_activity($order_id, false, $e->getMessage());
     }
 }
