@@ -5,14 +5,29 @@
 
 namespace SzamlazzHuFluentCart;
 
-use \SzamlaAgent\Language;
-use \SzamlaAgent\Document\Invoice\Invoice;
 use FluentCart\App\Models\TaxRate;
 
 // Exit if accessed directly
 if (!\defined('ABSPATH')) {
     exit;
 }
+
+// Language constants
+const LANGUAGE_HU = 'hu';
+const LANGUAGE_EN = 'en';
+const LANGUAGE_DE = 'de';
+const LANGUAGE_IT = 'it';
+const LANGUAGE_RO = 'ro';
+const LANGUAGE_SK = 'sk';
+const LANGUAGE_HR = 'hr';
+const LANGUAGE_FR = 'fr';
+const LANGUAGE_ES = 'es';
+const LANGUAGE_CZ = 'cz';
+const LANGUAGE_PL = 'pl';
+
+// Invoice type constants
+const INVOICE_TYPE_P_INVOICE = 1;
+const INVOICE_TYPE_E_INVOICE = 2;
 
 /**
  * Register admin menu
@@ -48,22 +63,19 @@ if (!\defined('ABSPATH')) {
     ]);
     \register_setting('szamlazz_hu_fluentcart_settings', 'szamlazz_hu_invoice_language', [
         'type' => 'string',
-        'default' => Language::LANGUAGE_HU,
+        'default' => LANGUAGE_HU,
         'sanitize_callback' => function($value) {
-            try {
-                $allowed = Language::getAll();
-                return in_array($value, $allowed) ? $value : Language::LANGUAGE_HU;
-            } catch (\Exception $e) {
-                return Language::LANGUAGE_HU;
-            }
+            $allowed = [LANGUAGE_HU, LANGUAGE_EN, LANGUAGE_DE, LANGUAGE_IT, LANGUAGE_RO, 
+                        LANGUAGE_SK, LANGUAGE_HR, LANGUAGE_FR, LANGUAGE_ES, LANGUAGE_CZ, LANGUAGE_PL];
+            return in_array($value, $allowed) ? $value : LANGUAGE_HU;
         }
     ]);
     \register_setting('szamlazz_hu_fluentcart_settings', 'szamlazz_hu_invoice_type', [
         'type' => 'integer',
-        'default' => Invoice::INVOICE_TYPE_P_INVOICE,
+        'default' => INVOICE_TYPE_P_INVOICE,
         'sanitize_callback' => function($value) {
-            $allowed = [Invoice::INVOICE_TYPE_P_INVOICE, Invoice::INVOICE_TYPE_E_INVOICE];
-            return in_array((int)$value, $allowed) ? (int)$value : Invoice::INVOICE_TYPE_P_INVOICE;
+            $allowed = [INVOICE_TYPE_P_INVOICE, INVOICE_TYPE_E_INVOICE];
+            return in_array((int)$value, $allowed) ? (int)$value : INVOICE_TYPE_P_INVOICE;
         }
     ]);
     \register_setting('szamlazz_hu_fluentcart_settings', 'szamlazz_hu_quantity_unit', [
@@ -122,19 +134,19 @@ if (!\defined('ABSPATH')) {
         'szamlazz_hu_invoice_language',
         \__('Invoice Language', 'integration-for-szamlazzhu-fluentcart'),
         function() {
-            $value = \get_option('szamlazz_hu_invoice_language', Language::LANGUAGE_HU);
+            $value = \get_option('szamlazz_hu_invoice_language', LANGUAGE_HU);
             $languages = [
-                Language::LANGUAGE_HU => \__('Magyar (Hungarian)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_EN => \__('English', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_DE => \__('Deutsch (German)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_IT => \__('Italiano (Italian)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_RO => \__('Română (Romanian)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_SK => \__('Slovenčina (Slovak)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_HR => \__('Hrvatski (Croatian)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_FR => \__('Français (French)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_ES => \__('Español (Spanish)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_CZ => \__('Čeština (Czech)', 'integration-for-szamlazzhu-fluentcart'),
-                Language::LANGUAGE_PL => \__('Polski (Polish)', 'integration-for-szamlazzhu-fluentcart')
+                LANGUAGE_HU => \__('Magyar (Hungarian)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_EN => \__('English', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_DE => \__('Deutsch (German)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_IT => \__('Italiano (Italian)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_RO => \__('Română (Romanian)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_SK => \__('Slovenčina (Slovak)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_HR => \__('Hrvatski (Croatian)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_FR => \__('Français (French)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_ES => \__('Español (Spanish)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_CZ => \__('Čeština (Czech)', 'integration-for-szamlazzhu-fluentcart'),
+                LANGUAGE_PL => \__('Polski (Polish)', 'integration-for-szamlazzhu-fluentcart')
             ];
             echo '<select name="szamlazz_hu_invoice_language">';
             foreach ($languages as $code => $name) {
@@ -150,10 +162,10 @@ if (!\defined('ABSPATH')) {
         'szamlazz_hu_invoice_type',
         \__('Invoice Type', 'integration-for-szamlazzhu-fluentcart'),
         function() {
-            $value = \get_option('szamlazz_hu_invoice_type', Invoice::INVOICE_TYPE_P_INVOICE);
+            $value = \get_option('szamlazz_hu_invoice_type', INVOICE_TYPE_P_INVOICE);
             $types = [
-                Invoice::INVOICE_TYPE_P_INVOICE => \__('Paper Invoice', 'integration-for-szamlazzhu-fluentcart'),
-                Invoice::INVOICE_TYPE_E_INVOICE => \__('E-Invoice', 'integration-for-szamlazzhu-fluentcart')
+                INVOICE_TYPE_P_INVOICE => \__('Paper Invoice', 'integration-for-szamlazzhu-fluentcart'),
+                INVOICE_TYPE_E_INVOICE => \__('E-Invoice', 'integration-for-szamlazzhu-fluentcart')
             ];
             echo '<select name="szamlazz_hu_invoice_type">';
             foreach ($types as $type_value => $type_name) {
