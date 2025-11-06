@@ -11,6 +11,30 @@ if (!\defined('ABSPATH')) {
 }
 
 /**
+ * Build multipart/form-data request body for Számlázz.hu API
+ * 
+ * @param string $xml_string The XML content to send
+ * @param string $field_name The form field name (e.g., 'action-xmlagentxmlfile')
+ * @return array Array with 'boundary' and 'body' keys
+ */
+function build_multipart_body($xml_string, $field_name) {
+    $boundary = wp_generate_password(24, false);
+    $body = '';
+    
+    // Add XML file with specified field name
+    $body .= "--{$boundary}\r\n";
+    $body .= 'Content-Disposition: form-data; name="' . $field_name . '"; filename="request.xml"' . "\r\n";
+    $body .= "Content-Type: application/xml\r\n\r\n";
+    $body .= $xml_string . "\r\n";
+    $body .= "--{$boundary}--\r\n";
+    
+    return array(
+        'boundary' => $boundary,
+        'body' => $body,
+    );
+}
+
+/**
  * Build XML for invoice generation
  * 
  * @param array $params Invoice parameters
@@ -132,23 +156,15 @@ function generate_invoice_api($order_id, $api_key, $params) {
     $xml_string = build_invoice_xml($params);
     
     // Create multipart/form-data request body
-    $boundary = wp_generate_password(24, false);
-    $body = '';
-    
-    // Add XML file as action-xmlagentxmlfile
-    $body .= "--{$boundary}\r\n";
-    $body .= 'Content-Disposition: form-data; name="action-xmlagentxmlfile"; filename="request.xml"' . "\r\n";
-    $body .= "Content-Type: application/xml\r\n\r\n";
-    $body .= $xml_string . "\r\n";
-    $body .= "--{$boundary}--\r\n";
+    $multipart = build_multipart_body($xml_string, 'action-xmlagentxmlfile');
     
     // Send request to Számlázz.hu API
     $response = \wp_remote_post('https://www.szamlazz.hu/szamla/', array(
         'timeout' => 30,
         'headers' => array(
-            'Content-Type' => 'multipart/form-data; boundary=' . $boundary,
+            'Content-Type' => 'multipart/form-data; boundary=' . $multipart['boundary'],
         ),
-        'body' => $body,
+        'body' => $multipart['body'],
     ));
     
     // Check for HTTP errors
@@ -231,23 +247,15 @@ function get_taxpayer_api($order_id, $api_key, $tax_number) {
     $xml_string = build_taxpayer_xml($api_key, $tax_number);
     
     // Create multipart/form-data request body
-    $boundary = wp_generate_password(24, false);
-    $body = '';
-    
-    // Add XML file as action-szamla_agent_taxpayer
-    $body .= "--{$boundary}\r\n";
-    $body .= 'Content-Disposition: form-data; name="action-szamla_agent_taxpayer"; filename="request.xml"' . "\r\n";
-    $body .= "Content-Type: application/xml\r\n\r\n";
-    $body .= $xml_string . "\r\n";
-    $body .= "--{$boundary}--\r\n";
+    $multipart = build_multipart_body($xml_string, 'action-szamla_agent_taxpayer');
     
     // Send request to Számlázz.hu API
     $response = \wp_remote_post('https://www.szamlazz.hu/szamla/', array(
         'timeout' => 30,
         'headers' => array(
-            'Content-Type' => 'multipart/form-data; boundary=' . $boundary,
+            'Content-Type' => 'multipart/form-data; boundary=' . $multipart['boundary'],
         ),
-        'body' => $body,
+        'body' => $multipart['body'],
     ));
     
     // Check for HTTP errors
@@ -371,23 +379,15 @@ function fetch_invoice_pdf($order_id, $api_key, $invoice_number) {
     $xml_string = $xml->asXML();
     
     // Create multipart/form-data request body
-    $boundary = wp_generate_password(24, false);
-    $body = '';
-    
-    // Add XML file as action-szamla_agent_pdf
-    $body .= "--{$boundary}\r\n";
-    $body .= 'Content-Disposition: form-data; name="action-szamla_agent_pdf"; filename="request.xml"' . "\r\n";
-    $body .= "Content-Type: application/xml\r\n\r\n";
-    $body .= $xml_string . "\r\n";
-    $body .= "--{$boundary}--\r\n";
+    $multipart = build_multipart_body($xml_string, 'action-szamla_agent_pdf');
     
     // Send request to Számlázz.hu API using WordPress HTTP API
     $response = \wp_remote_post('https://www.szamlazz.hu/szamla/', array(
         'timeout' => 30,
         'headers' => array(
-            'Content-Type' => 'multipart/form-data; boundary=' . $boundary,
+            'Content-Type' => 'multipart/form-data; boundary=' . $multipart['boundary'],
         ),
-        'body' => $body,
+        'body' => $multipart['body'],
     ));
     
     // Check for HTTP errors
