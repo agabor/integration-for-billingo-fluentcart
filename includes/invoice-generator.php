@@ -12,13 +12,6 @@ if (!\defined('ABSPATH')) {
     exit;
 }
 
-use \SzamlaAgent\SzamlaAgentAPI;
-use \SzamlaAgent\Buyer;
-use \SzamlaAgent\Seller;
-use \SzamlaAgent\Language;
-use \SzamlaAgent\Document\Invoice\Invoice;
-use \SzamlaAgent\Item\InvoiceItem;
-
 use FluentCart\App\Models\Activity;
 use FluentCart\App\Models\Cart;
 use FluentCart\App\Models\OrderItem;
@@ -54,108 +47,41 @@ function get_vat_number($order_id) {
  * Fetch and parse taxpayer data from NAV
  * 
  * @param int $order_id The order ID
- * @param object $agent The SzamlaAgent instance
+ * @param string $api_key The API key
  * @param string $vat_number The VAT number
  * @return array|null The taxpayer data or null
  */
-function get_taxpayer_data($order_id, $agent, $vat_number) {
+function get_taxpayer_data($order_id, $api_key, $vat_number) {
     try {
         write_log($order_id, 'Fetching taxpayer data from NAV', 'VAT number', $vat_number);
         
-        $taxpayer_response = $agent->getTaxPayer($vat_number);
-        $taxpayer_xml = $taxpayer_response->getTaxPayerData();
+        $taxpayer_data = get_taxpayer_api($api_key, $vat_number);
         
-        if (!$taxpayer_xml) {
-            write_log($order_id, 'No taxpayer data returned from NAV');
+        if (\is_wp_error($taxpayer_data)) {
+            write_log($order_id, 'Failed to fetch taxpayer data', 'Error', $taxpayer_data->get_error_message());
             return null;
         }
         
-        write_log($order_id, 'Taxpayer XML received, parsing data');
-        
-        $xml = new \SimpleXMLElement($taxpayer_xml);
-        
-        // Register namespaces
-        $xml->registerXPathNamespace('ns2', 'http://schemas.nav.gov.hu/OSA/3.0/api');
-        $xml->registerXPathNamespace('ns3', 'http://schemas.nav.gov.hu/OSA/3.0/base');
-
-        $taxpayerValidity = $xml->xpath('//ns2:taxpayerValidity');
-        if ("true" === (string)$taxpayerValidity[0]) {
+        if (!empty($taxpayer_data['valid'])) {
             write_log($order_id, 'Taxpayer is valid');
-        } else {
-            write_log($order_id, 'Taxpayer is not valid');
-            return;
-        }
-
-        $data = [];
-        
-        // Extract taxpayer name
-        $taxpayer_short_name = $xml->xpath('//ns2:taxpayerShortName');
-        $taxpayer_name = $xml->xpath('//ns2:taxpayerName');
-        
-        if (!empty($taxpayer_short_name)) {
-            $data['name'] = (string)$taxpayer_short_name[0];
-            write_log($order_id, 'Taxpayer name extracted', 'Name', $data['name']);
-        } elseif (!empty($taxpayer_name)) {
-            $data['name'] = (string)$taxpayer_name[0];
-            write_log($order_id, 'Taxpayer name extracted', 'Name', $data['name']);
-        }
-        
-        // Extract VAT ID components
-        $taxpayer_id = $xml->xpath('//ns3:taxpayerId');
-        $vat_code = $xml->xpath('//ns3:vatCode');
-        $county_code = $xml->xpath('//ns3:countyCode');
-        
-        if (!empty($taxpayer_id) && !empty($vat_code) && !empty($county_code)) {
-            $data['vat_id'] = sprintf(
-                '%s-%s-%s',
-                (string)$taxpayer_id[0],
-                (string)$vat_code[0],
-                (string)$county_code[0]
-            );
-            write_log($order_id, 'VAT ID formatted', $data['vat_id']);
-        }
-        
-        // Extract address
-        $postal_code = $xml->xpath('//ns3:postalCode');
-        $city = $xml->xpath('//ns3:city');
-        $street_name = $xml->xpath('//ns3:streetName');
-        $public_place = $xml->xpath('//ns3:publicPlaceCategory');
-        $number = $xml->xpath('//ns3:number');
-        $door = $xml->xpath('//ns3:door');
-        
-        if (!empty($postal_code)) {
-            $data['postcode'] = (string)$postal_code[0];
-        }
-        
-        if (!empty($city)) {
-            $data['city'] = (string)$city[0];
-        }
-        
-        if (!empty($street_name)) {
-            $address_parts = [(string)$street_name[0]];
             
-            if (!empty($public_place)) {
-                $address_parts[] = (string)$public_place[0];
+            if (isset($taxpayer_data['name'])) {
+                write_log($order_id, 'Taxpayer name extracted', 'Name', $taxpayer_data['name']);
+            }
+            if (isset($taxpayer_data['vat_id'])) {
+                write_log($order_id, 'VAT ID formatted', $taxpayer_data['vat_id']);
+            }
+            if (isset($taxpayer_data['postcode']) && isset($taxpayer_data['city']) && isset($taxpayer_data['address'])) {
+                write_log($order_id, 'Taxpayer address extracted', $taxpayer_data['postcode'], $taxpayer_data['city'], $taxpayer_data['address']);
             }
             
-            if (!empty($number)) {
-                $address_parts[] = (string)$number[0];
-            }
+            write_log($order_id, 'Taxpayer data successfully parsed from NAV');
             
-            if (!empty($door)) {
-                $address_parts[] = (string)$door[0];
-            }
-            
-            $data['address'] = implode(' ', $address_parts);
+            return $taxpayer_data;
         }
         
-        if (isset($data['postcode']) && isset($data['city']) && isset($data['address'])) {
-            write_log($order_id, 'Taxpayer address extracted', $data['postcode'], $data['city'], $data['address']);
-        }
-        
-        write_log($order_id, 'Taxpayer data successfully parsed from NAV');
-        
-        return $data;
+        write_log($order_id, 'Taxpayer is not valid');
+        return null;
         
     } catch (\Exception $e) {
         write_log($order_id, 'Failed to fetch taxpayer data', 'Error', $e->getMessage());
@@ -164,15 +90,15 @@ function get_taxpayer_data($order_id, $agent, $vat_number) {
 }
 
 /**
- * Create buyer object from order data
+ * Create buyer data array from order data
  * 
  * @param object $order The order object
- * @param object $agent The SzamlaAgent instance
+ * @param string $api_key The API key
  * @param string|null $vat_number The VAT number
- * @return Buyer The buyer object
+ * @return array The buyer data array
  * @throws \Exception If billing address is not found
  */
-function create_buyer($order, $agent, $vat_number = null) {
+function create_buyer_data($order, $api_key, $vat_number = null) {
     $order_id = $order->id;
     
     // Get billing address
@@ -186,11 +112,12 @@ function create_buyer($order, $agent, $vat_number = null) {
     $buyer_postcode = $billing->postcode;
     $buyer_city = $billing->city;
     $buyer_address = $billing->address_1 . ($billing->address_2 ? ' ' . $billing->address_2 : '');
-    $buyer_vat_id = $billing->country . $vat_number;
+    $buyer_country = $billing->country ?? '';
+    $buyer_vat_id = null;
     
     // If VAT number is provided, try to get taxpayer data from NAV
     if (!empty($vat_number)) {
-        $taxpayer_data = get_taxpayer_data($order_id, $agent, $vat_number);
+        $taxpayer_data = get_taxpayer_data($order_id, $api_key, $vat_number);
         
         if ($taxpayer_data) {
             if (isset($taxpayer_data['name'])) {
@@ -208,56 +135,60 @@ function create_buyer($order, $agent, $vat_number = null) {
             if (isset($taxpayer_data['address'])) {
                 $buyer_address = $taxpayer_data['address'];
             }
+        } else {
+            // If taxpayer lookup failed, use country + VAT number
+            $buyer_vat_id = $buyer_country . $vat_number;
         }
     }
     
-    // Create buyer
-    $buyer = new Buyer(
-        $buyer_name,
-        $buyer_postcode,
-        $buyer_city,
-        $buyer_address
+    // Build buyer data array
+    $buyer_data = array(
+        'name' => $buyer_name,
+        'postcode' => $buyer_postcode,
+        'city' => $buyer_city,
+        'address' => $buyer_address,
+        'country' => $buyer_country,
     );
     
     // Set VAT ID if available
     if (!empty($buyer_vat_id)) {
-        $buyer->setTaxNumber($buyer_vat_id);
+        $buyer_data['tax_number'] = $buyer_vat_id;
     }
     
     // Set buyer email if available
     $meta = $billing->meta;
     if (isset($meta['other_data']['email'])) {
-        $buyer->setEmail($meta['other_data']['email']);
+        $buyer_data['email'] = $meta['other_data']['email'];
+        $buyer_data['send_email'] = false; // Don't send email by default
     }
     
-    return $buyer;
+    write_log($order_id, 'Buyer data created', 'Name', $buyer_name, 'City', $buyer_city);
+    
+    return $buyer_data;
 }
 
 /**
- * Create seller object with email settings
+ * Create seller data array with email settings
  * 
  * @param int $order_id The order ID
- * @return Seller The seller object
+ * @return array The seller data array
  */
-function create_seller($order_id) {
-    $seller = new Seller();
-    
-    // Configure email settings
-    $seller->setEmailReplyTo(\get_option('admin_email'));
-    $seller->setEmailSubject('Invoice for order #' . $order_id);
-    $seller->setEmailContent('Thank you for your order. Please find your invoice attached.');
-    
-    return $seller;
+function create_seller_data($order_id) {
+    return array(
+        'email_reply_to' => \get_option('admin_email'),
+        'email_subject' => 'Invoice for order #' . $order_id,
+        'email_content' => 'Thank you for your order. Please find your invoice attached.',
+    );
 }
 
 /**
- * Add order items to invoice
+ * Build order items data array
  * 
- * @param Invoice $invoice The invoice object
  * @param object $order The order object
+ * @return array The items data array
  * @throws \Exception If no items found
  */
-function add_order_items($invoice, $order) {
+function build_order_items_data($order) {
     $order_id = $order->id;
     $items = OrderItem::where('order_id', $order_id)->get();
     
@@ -268,31 +199,34 @@ function add_order_items($invoice, $order) {
     // Get quantity unit from settings
     $quantity_unit = \get_option('szamlazz_hu_quantity_unit', 'db');
     
-    write_log($order_id, 'Adding order items', 'Item count', $items->count());
+    write_log($order_id, 'Building order items', 'Item count', $items->count());
+    
+    $items_data = array();
     
     foreach ($items as $order_item) {
         $taxRate = "0";
+        $tax_amount = 0;
+        
         if ($order->tax_behavior != 0) {
             if (isset($order_item->line_meta['tax_config']['rates'][0]['rate'])) {
                 $taxRate = $order_item->line_meta['tax_config']['rates'][0]['rate'];
             }
-        }
-        
-        $item = new InvoiceItem(
-            $order_item->title,
-            $order_item->unit_price / 100,
-            $order_item->quantity,
-            $quantity_unit,
-            strval($taxRate)
-        );
-        
-        $item->setNetPrice($order_item->line_total / 100);
-        $tax_amount = 0;
-        if ($order->tax_behavior != 0) {
             $tax_amount = $order_item->tax_amount / 100;
         }
-        $item->setVatAmount($tax_amount);
-        $item->setGrossAmount($order_item->line_total / 100 + $tax_amount);
+        
+        $net_price = $order_item->line_total / 100;
+        $gross_amount = $net_price + $tax_amount;
+        
+        $items_data[] = array(
+            'name' => $order_item->title,
+            'quantity' => $order_item->quantity,
+            'unit' => $quantity_unit,
+            'unit_price' => $order_item->unit_price / 100,
+            'vat_rate' => $taxRate,
+            'net_price' => $net_price,
+            'vat_amount' => $tax_amount,
+            'gross_amount' => $gross_amount,
+        );
         
         write_log(
             $order_id, 
@@ -305,36 +239,44 @@ function add_order_items($invoice, $order) {
             'Tax rate', 
             $taxRate . '%',
             'Net', 
-            $order_item->line_total / 100,
+            $net_price,
             'VAT', 
-            $order_item->tax_amount / 100,
+            $tax_amount,
             'Gross', 
-            ($order_item->line_total + $order_item->tax_amount) / 100
+            $gross_amount
         );
-        
-        $invoice->addItem($item);
     }
+    
+    // Add shipping if applicable
     if ($order->shipping_total != 0) {
         // Get shipping title from settings
         $shipping_title = \get_option('szamlazz_hu_shipping_title', 'Szállítás');
+        $shipping_net = $order->shipping_total / 100;
+        $shipping_vat_amount = 0;
+        $shipping_vat_rate = "0";
         
-        $item = new InvoiceItem($shipping_title, $order->shipping_total / 100);
-        $item->setNetPrice($order->shipping_total / 100);
         if ($order->tax_behavior != 0) {
             // Get shipping VAT rate from settings
             $shipping_vat = \get_option('szamlazz_hu_shipping_vat', 27);
-            $vat_multiplier = 1 + ($shipping_vat / 100);
-            
-            $item->setVatAmount($order->shipping_total * ($shipping_vat / 100) / 100);
-            $item->setVat(strval($shipping_vat));
-            $item->setGrossAmount($order->shipping_total * $vat_multiplier / 100);
-        } else {
-            $item->setVatAmount(0);
-            $item->setVat("0");
-            $item->setGrossAmount($order->shipping_total / 100);
+            $shipping_vat_rate = strval($shipping_vat);
+            $shipping_vat_amount = $shipping_net * ($shipping_vat / 100);
         }
-        $invoice->addItem($item);
+        
+        $shipping_gross = $shipping_net + $shipping_vat_amount;
+        
+        $items_data[] = array(
+            'name' => $shipping_title,
+            'quantity' => 1,
+            'unit' => 'db',
+            'unit_price' => $shipping_net,
+            'vat_rate' => $shipping_vat_rate,
+            'net_price' => $shipping_net,
+            'vat_amount' => $shipping_vat_amount,
+            'gross_amount' => $shipping_gross,
+        );
     }
+    
+    return $items_data;
 }
 
 /**
@@ -360,7 +302,7 @@ function log_activity($order_id, $success, $message) {
  * Generate invoice via Számlázz.hu API
  * 
  * @param object $order The order object
- * @return object The invoice generation result
+ * @return array|WP_Error The invoice generation result
  * @throws \Exception If API key is not configured
  */
 function generate_invoice($order) {
@@ -370,9 +312,6 @@ function generate_invoice($order) {
     
     // Get and validate API key
     $api_key = get_api_key();
-    // Create Számla Agent
-    $agent = SzamlaAgentAPI::create($api_key);
-    $agent->setPdfFileSave(false);
     
     // Get VAT number from checkout data
     $vat_number = get_vat_number($order_id);
@@ -382,37 +321,62 @@ function generate_invoice($order) {
         write_log($order_id, 'No VAT number provided');
     }
     
-    // Create buyer with taxpayer data if available
-    $buyer = create_buyer($order, $agent, $vat_number);
-    write_log($order_id, 'Buyer created', 'Name', $buyer->getName(), 'City', $buyer->getCity());
+    // Create buyer data with taxpayer data if available
+    $buyer_data = create_buyer_data($order, $api_key, $vat_number);
     
-    // Create seller with email settings
-    $seller = create_seller($order_id);
+    // Create seller data with email settings
+    $seller_data = create_seller_data($order_id);
     
-    // Get invoice type from settings
-    $invoice_type = \get_option('szamlazz_hu_invoice_type', Invoice::INVOICE_TYPE_P_INVOICE);
-    
-    // Create invoice
-    $invoice = new Invoice($invoice_type);
-    $invoice->setBuyer($buyer);
-    $invoice->setSeller($seller);
-    $invoice->getHeader()->setCurrency($order->currency);
+    // Get invoice type from settings (1 = paper, 2 = e-invoice)
+    $invoice_type = \get_option('szamlazz_hu_invoice_type', 1);
     
     // Get invoice language from settings
-    $invoice_language = \get_option('szamlazz_hu_invoice_language', Language::LANGUAGE_HU);
-    $invoice->getHeader()->setLanguage($invoice_language);
+    $invoice_language = \get_option('szamlazz_hu_invoice_language', 'hu');
     
-    $invoice_type_name = ($invoice_type == Invoice::INVOICE_TYPE_E_INVOICE) ? 'E-Invoice' : 'Paper Invoice';
+    $invoice_type_name = ($invoice_type == 2) ? 'E-Invoice' : 'Paper Invoice';
     write_log($order_id, 'Invoice type set to', $invoice_type_name);
     write_log($order_id, 'Invoice language set to', $invoice_language);
     
-    // Add order items to invoice
-    add_order_items($invoice, $order);
+    // Build order items data
+    $items_data = build_order_items_data($order);
+    
+    // Build invoice header data
+    $today = date('Y-m-d');
+    $due_date = date('Y-m-d', strtotime('+8 days'));
+    
+    $header_data = array(
+        'issue_date' => $today,
+        'fulfillment_date' => $today,
+        'due_date' => $due_date,
+        'payment_method' => 'Átutalás',
+        'currency' => $order->currency,
+        'language' => $invoice_language,
+        'comment' => '',
+        'order_number' => strval($order_id),
+        'proforma_number' => '',
+        'prepayment_invoice' => 'false',
+        'final_invoice' => 'false',
+        'corrective_invoice' => 'false',
+        'corrective_invoice_number' => '',
+        'proforma' => 'false',
+        'invoice_prefix' => '',
+        'paid' => 'false',
+    );
+    
+    // Build complete invoice parameters
+    $params = array(
+        'invoice_type' => $invoice_type,
+        'download_pdf' => true,
+        'header' => $header_data,
+        'seller' => $seller_data,
+        'buyer' => $buyer_data,
+        'items' => $items_data,
+    );
     
     write_log($order_id, 'Generating invoice via API');
     
-    // Generate invoice
-    return $agent->generateInvoice($invoice);
+    // Generate invoice using the new API
+    return generate_invoice_api($api_key, $params);
 }
 
 /**
@@ -443,20 +407,30 @@ function create_invoice($order, $main_order = null) {
         }
         
         $result = generate_invoice($main_order);
+        
+        // Check for errors
+        if (\is_wp_error($result)) {
+            throw new \Exception('Failed to generate invoice: ' . $result->get_error_message());
+        }
+        
         // Check if invoice was created successfully
-        if ($result->isSuccess()) {
-            $invoice_number = $result->getDocumentNumber();
+        if (!empty($result['success']) && !empty($result['invoice_number'])) {
+            $invoice_number = $result['invoice_number'];
             
             write_log($order_id, 'Invoice generated successfully', 'Invoice number', $invoice_number);
             
-            // Save to database
-            save_invoice($order_id, $result);
+            // Save to database - create a compatible result object
+            $result_obj = (object) array(
+                'invoice_number' => $invoice_number,
+                'pdf_data' => $result['pdf_data'] ?? null,
+            );
+            save_invoice($order_id, $result_obj);
             
             // Log success
             $message = sprintf('Számlázz.hu invoice created: %s', $invoice_number);
             log_activity($order_id, true, $message);
         } else {
-            throw new \Exception('Failed to generate invoice: ' . $result->getMessage());
+            throw new \Exception('Failed to generate invoice: Unknown error');
         }
         
     } catch (\Exception $e) {
