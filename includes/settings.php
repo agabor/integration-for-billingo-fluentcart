@@ -1,18 +1,13 @@
 <?php
-/**
- * Settings page and configuration
- */
 
 namespace SzamlazzHuFluentCart;
 
 use FluentCart\App\Models\TaxRate;
 
-// Exit if accessed directly
 if (!\defined('ABSPATH')) {
     exit;
 }
 
-// Language constants
 const LANGUAGE_HU = 'hu';
 const LANGUAGE_EN = 'en';
 const LANGUAGE_DE = 'de';
@@ -25,13 +20,9 @@ const LANGUAGE_ES = 'es';
 const LANGUAGE_CZ = 'cz';
 const LANGUAGE_PL = 'pl';
 
-// Invoice type constants
 const INVOICE_TYPE_P_INVOICE = 1;
 const INVOICE_TYPE_E_INVOICE = 2;
 
-/**
- * Register admin menu
- */
 \add_action('admin_menu', function() {
     \add_options_page(
         \__('Számlázz.hu for FluentCart Settings', 'integration-for-szamlazzhu-fluentcart'),
@@ -42,14 +33,10 @@ const INVOICE_TYPE_E_INVOICE = 2;
     );
 });
 
-/**
- * Register settings
- */
 \add_action('admin_init', function() {
     \register_setting('szamlazz_hu_fluentcart_settings', 'szamlazz_hu_agent_api_key', [
         'type' => 'string',
         'sanitize_callback' => function($value) {
-            // Trim whitespace and sanitize the API key
             return sanitize_text_field(trim($value));
         }
     ]);
@@ -89,13 +76,11 @@ const INVOICE_TYPE_E_INVOICE = 2;
         'sanitize_callback' => 'sanitize_text_field'
     ]);
     
-    // Handle clear cache action
     if (isset($_POST['szamlazz_hu_clear_cache']) && \check_admin_referer('szamlazz_hu_clear_cache_action', 'szamlazz_hu_clear_cache_nonce')) {
         clear_cache();
         \add_settings_error('szamlazz_hu_messages', 'szamlazz_hu_cache_cleared', \__('Cache cleared successfully', 'integration-for-szamlazzhu-fluentcart'), 'updated');
     }
     
-    // Handle apply shipping VAT action
     if (isset($_POST['szamlazz_hu_apply_shipping_vat']) && \check_admin_referer('szamlazz_hu_apply_shipping_vat_action', 'szamlazz_hu_apply_shipping_vat_nonce')) {
         $shipping_vat = \get_option('szamlazz_hu_shipping_vat', 27);
         setShippingTaxRate($shipping_vat);
@@ -236,9 +221,6 @@ const INVOICE_TYPE_E_INVOICE = 2;
     
 });
 
-/**
- * Add settings link to plugins page
- */
 \add_filter('plugin_action_links_' . \plugin_basename(\dirname(__DIR__) . '/integration-for-szamlazzhu-fluentcart.php'), function($links) {
     $settings_link = sprintf(
         '<a href="%s">%s</a>',
@@ -249,9 +231,6 @@ const INVOICE_TYPE_E_INVOICE = 2;
     return $links;
 });
 
-/**
- * Settings page callback
- */
 function settings_page() {
     if (!\current_user_can('manage_options')) {
         return;
@@ -262,7 +241,6 @@ function settings_page() {
     <div class="wrap">
         <h1><?php echo \esc_html(\get_admin_page_title()); ?></h1>
         
-        <!-- API Settings Form -->
         <form action="options.php" method="post">
             <?php
             \settings_fields('szamlazz_hu_fluentcart_settings');
@@ -274,7 +252,6 @@ function settings_page() {
         
         <h2><?php echo \esc_html__('Shipping VAT Settings', 'integration-for-szamlazzhu-fluentcart'); ?></h2>
         
-        <!-- Apply Shipping VAT Form -->
         <?php
         $current_rates = getShippingTaxRates();
         $selected_vat = \get_option('szamlazz_hu_shipping_vat', 27);
@@ -286,7 +263,6 @@ function settings_page() {
             <?php \submit_button(\__('Apply Shipping VAT to All Tax Rates', 'integration-for-szamlazzhu-fluentcart'), 'primary', 'submit', false, $is_button_disabled ? ['disabled' => true] : []); ?>
         </form>
         
-        <!-- Cache Management Section -->
         <h2><?php echo \esc_html__('Cache Management', 'integration-for-szamlazzhu-fluentcart'); ?></h2>
         <?php
         $cache_size = get_cache_size();
@@ -295,7 +271,6 @@ function settings_page() {
         <p><?php echo \esc_html__('Current cache size:', 'integration-for-szamlazzhu-fluentcart'); ?> <strong><?php echo \esc_html($formatted_size); ?></strong></p>
         <p class="description"><?php echo \esc_html__('Clearing the cache will delete all cached PDFs, XMLs, and logs.', 'integration-for-szamlazzhu-fluentcart'); ?></p>
         
-        <!-- Clear Cache Form -->
         <form action="<?php echo \esc_url(\admin_url('options-general.php?page=integration-for-szamlazzhu-fluentcart')); ?>" method="post" style="margin-top: 20px;">
             <?php \wp_nonce_field('szamlazz_hu_clear_cache_action', 'szamlazz_hu_clear_cache_nonce'); ?>
             <input type="hidden" name="szamlazz_hu_clear_cache" value="1" />
@@ -305,9 +280,6 @@ function settings_page() {
     <?php
 }
 
-/**
- * Set shipping tax rate for all Hungarian tax rates
- */
 function setShippingTaxRate($vatRate) {
     $taxRates = TaxRate::where('country', 'HU')->get();
     foreach ($taxRates as $rate) {
@@ -316,19 +288,14 @@ function setShippingTaxRate($vatRate) {
     }
 }
 
-/**
- * Get all unique shipping tax rates for Hungarian tax rates
- */
 function getShippingTaxRates() {
     $taxRates = TaxRate::where('country', 'HU')->get();
     $rates = [];
     
     foreach ($taxRates as $taxRate) {
-        // Use for_shipping if not null, otherwise use rate
         $rate = $taxRate->for_shipping !== null ? $taxRate->for_shipping : $taxRate->rate;
         $rates[] = $rate;
     }
     
-    // Return only distinct values
     return array_values(array_unique($rates));
 }
