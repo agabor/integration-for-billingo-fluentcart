@@ -75,6 +75,18 @@ const INVOICE_TYPE_E_INVOICE = 2;
         'default' => 'Szállítás',
         'sanitize_callback' => 'sanitize_text_field'
     ]);
+    \register_setting('billingo_fluentcart_fluentcart_settings', 'billingo_fluentcart_document_block_id', [
+        'type' => 'string',
+        'default' => '',
+        'sanitize_callback' => function($value) {
+            return empty($value) ? '' : absint($value);
+        }
+    ]);
+    \register_setting('billingo_fluentcart_fluentcart_settings', 'billingo_fluentcart_payment_method', [
+        'type' => 'string',
+        'default' => 'Átutalás',
+        'sanitize_callback' => 'sanitize_text_field'
+    ]);
     
     if (isset($_POST['billingo_fluentcart_clear_cache']) && \check_admin_referer('billingo_fluentcart_clear_cache_action', 'billingo_fluentcart_clear_cache_nonce')) {
         clear_cache();
@@ -179,6 +191,43 @@ const INVOICE_TYPE_E_INVOICE = 2;
         function() {
             $value = \get_option('billingo_fluentcart_shipping_title', 'Szállítás');
             echo '<input type="text" name="billingo_fluentcart_shipping_title" value="' . \esc_attr($value) . '" class="regular-text" />';
+        },
+        'integration-for-billingo-fluentcart',
+        'billingo_fluentcart_invoice_section'
+    );
+    
+    \add_settings_field(
+        'billingo_fluentcart_document_block_id',
+        \__('Document Block ID', 'integration-for-billingo-fluentcart'),
+        function() {
+            $value = \get_option('billingo_fluentcart_document_block_id', '');
+            echo '<input type="number" name="billingo_fluentcart_document_block_id" value="' . \esc_attr($value) . '" class="regular-text" min="1" />';
+            echo '<p class="description">' . \esc_html__('Optional: Enter your Billingo document block (invoice pad) ID. If left empty, the first available invoice block will be used automatically.', 'integration-for-billingo-fluentcart') . '</p>';
+        },
+        'integration-for-billingo-fluentcart',
+        'billingo_fluentcart_invoice_section'
+    );
+    
+    \add_settings_field(
+        'billingo_fluentcart_payment_method',
+        \__('Payment Method', 'integration-for-billingo-fluentcart'),
+        function() {
+            $value = \get_option('billingo_fluentcart_payment_method', 'Átutalás');
+            $payment_methods = [
+                'Átutalás' => \__('Wire Transfer', 'integration-for-billingo-fluentcart'),
+                'Készpénz' => \__('Cash', 'integration-for-billingo-fluentcart'),
+                'Bankkártya' => \__('Bank Card', 'integration-for-billingo-fluentcart'),
+                'Csekk' => \__('Check', 'integration-for-billingo-fluentcart'),
+                'Utánvét' => \__('Cash on Delivery', 'integration-for-billingo-fluentcart'),
+                'PayPal' => 'PayPal',
+                'Barion' => 'Barion',
+                'Egyéb' => \__('Other', 'integration-for-billingo-fluentcart'),
+            ];
+            echo '<select name="billingo_fluentcart_payment_method">';
+            foreach ($payment_methods as $method_value => $method_name) {
+                echo '<option value="' . \esc_attr($method_value) . '" ' . ($method_value == $value ? 'selected>' : '>') . \esc_html($method_name) . '</option>';
+            }
+            echo '</select>';
         },
         'integration-for-billingo-fluentcart',
         'billingo_fluentcart_invoice_section'
