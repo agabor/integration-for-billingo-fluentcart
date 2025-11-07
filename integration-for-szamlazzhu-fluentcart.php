@@ -13,7 +13,6 @@
 
 namespace SzamlazzHuFluentCart;
 
-// Exit if accessed directly
 if (!\defined('ABSPATH')) {
     exit;
 }
@@ -26,39 +25,30 @@ require __DIR__ . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'sett
 
 use FluentCart\App\Models\Order;
 
-/**
- * Initialize Szamlazz.hu base path and ensure required folders exist
- */
 function init_paths() {
-    // Get or generate a random 8-character suffix
     $suffix = get_option('szamlazz_hu_folder_suffix', '');
     if (empty($suffix)) {
         $suffix = substr(bin2hex(random_bytes(4)), 0, 8);
         update_option('szamlazz_hu_folder_suffix', $suffix);
     }
     
-    // Use WordPress cache directory
     $cache_dir = WP_CONTENT_DIR . DIRECTORY_SEPARATOR . 'cache';
     $base_path = $cache_dir . DIRECTORY_SEPARATOR . 'integration-for-szamlazzhu-fluentcart-' . $suffix;
     
-    // Define required folders
     $required_folders = [
         'logs',
         'pdf',
         'xmls'
     ];
     
-    // Create cache directory if it doesn't exist
     if (!file_exists($cache_dir)) {
         wp_mkdir_p($cache_dir);
     }
     
-    // Create base directory if it doesn't exist
     if (!file_exists($base_path)) {
         wp_mkdir_p($base_path);
     }
     
-    // Create required subdirectories if they don't exist
     foreach ($required_folders as $folder) {
         $folder_path = $base_path . DIRECTORY_SEPARATOR . $folder;
         if (!file_exists($folder_path)) {
@@ -69,9 +59,6 @@ function init_paths() {
     return $base_path;
 }
 
-/**
- * Get the cache directory path
- */
 function get_cache_path() {
     $suffix = get_option('szamlazz_hu_folder_suffix', '');
     if (empty($suffix)) {
@@ -82,9 +69,6 @@ function get_cache_path() {
     return $cache_dir . DIRECTORY_SEPARATOR . 'integration-for-szamlazzhu-fluentcart-' . $suffix;
 }
 
-/**
- * Get the cache directory size in bytes
- */
 function get_cache_size() {
     $cache_path = get_cache_path();
     if (!$cache_path || !file_exists($cache_path)) {
@@ -105,32 +89,14 @@ function get_cache_size() {
     return $size;
 }
 
-/**
- * Format bytes to human-readable size
- */
-function format_bytes($bytes, $precision = 2) {
-    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    
-    for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
-        $bytes /= 1024;
-    }
-    
-    return round($bytes, $precision) . ' ' . $units[$i];
-}
-
-/**
- * Clear the cache directory
- */
 function clear_cache() {
     $cache_path = get_cache_path();
     
     if ($cache_path && file_exists($cache_path)) {
-        // Initialize WP_Filesystem
         require_once(ABSPATH . 'wp-admin/includes/file.php');
         WP_Filesystem();
         global $wp_filesystem;
         
-        // Recursively delete all files and folders
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($cache_path, \RecursiveDirectoryIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::CHILD_FIRST
@@ -144,17 +110,12 @@ function clear_cache() {
             }
         }
         
-        // Remove the main directory
         $wp_filesystem->rmdir($cache_path);
     }
     
-    // Delete the suffix option to regenerate a new one
     delete_option('szamlazz_hu_folder_suffix');
 }
 
-/**
- * Get PDF file path for invoice number
- */
 function get_pdf_path($invoice_number) {
     $cache_path = get_cache_path();
     if (!$cache_path) {
@@ -163,7 +124,6 @@ function get_pdf_path($invoice_number) {
     
     $pdf_dir = $cache_path . DIRECTORY_SEPARATOR . 'pdf';
     
-    // Search for PDF files matching the invoice number
     if (file_exists($pdf_dir)) {
         $files = glob($pdf_dir . DIRECTORY_SEPARATOR . '*' . $invoice_number . '*.pdf');
         if (!empty($files)) {
@@ -174,11 +134,7 @@ function get_pdf_path($invoice_number) {
     return null;
 }
 
-/**
- * Create database table on plugin activation
- */
 \register_activation_hook(__FILE__, __NAMESPACE__ . '\\create_invoices_table');
-
 
 \add_action('fluent_cart/order_paid_done', function($data) {
     $order = $data['order'];
@@ -205,7 +161,6 @@ function get_pdf_path($invoice_number) {
         return;
     }
     
-    // Extract and sanitize GET parameters
     $order_hash = isset($get_params['order_hash']) ? \sanitize_text_field(\wp_unslash($get_params['order_hash'])) : '';
     $download = isset($get_params['download']) ? \sanitize_text_field(\wp_unslash($get_params['download'])) : '';
     
@@ -216,49 +171,38 @@ function get_pdf_path($invoice_number) {
     $order_id = Order::where('uuid', $order_hash)->value('id');
     
     try {
-        // Initialize paths and ensure folders exist
         init_paths();
         
-        // Get API key from settings
         $api_key = \get_option('szamlazz_hu_agent_api_key', '');
         
         if (empty($api_key)) {
             return;
         }
         
-        // Check if invoice exists in database
         $invoice_number = get_invoice_number_by_order_id($order_id);
         
         if ($invoice_number) {
-            // Check if PDF exists in cache
             $cached_pdf_path = get_pdf_path($invoice_number);
             
             if ($cached_pdf_path && \file_exists($cached_pdf_path)) {
-                // Serve from cache
                 serve_pdf_download($cached_pdf_path);
             }
             
-            // PDF not in cache, fetch from API using WordPress HTTP API
             $result = fetch_invoice_pdf($order_id, $api_key, $invoice_number);
             
-            // Check if fetch was successful
             if (!is_wp_error($result) && isset($result['success']) && $result['success']) {
-                // Save PDF to cache
                 $cache_path = get_cache_path();
                 if ($cache_path) {
                     $pdf_dir = $cache_path . DIRECTORY_SEPARATOR . 'pdf';
                     $pdf_filename = $pdf_dir . DIRECTORY_SEPARATOR . $result['filename'];
                     
-                    // Initialize WP_Filesystem
                     require_once(ABSPATH . 'wp-admin/includes/file.php');
                     WP_Filesystem();
                     global $wp_filesystem;
                     
-                    // Save PDF file
                     $wp_filesystem->put_contents($pdf_filename, $result['pdf_data'], FS_CHMOD_FILE);
                 }
                 
-                // Serve PDF to user
                 serve_pdf_download(null, $result['pdf_data'], $result['filename']);
             }
         }
