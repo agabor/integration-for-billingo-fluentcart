@@ -11,11 +11,6 @@ use FluentCart\App\Models\Cart;
 use FluentCart\App\Models\OrderItem;
 
 
-function get_vat_number($order_id) {
-    $checkout_data = Cart::where('order_id', $order_id)->first()['checkout_data'];
-    return $checkout_data['tax_data']['vat_number'] ?? null;
-}
-
 function get_taxpayer_data($order_id, $api_key, $vat_number) {
     try {
         write_log($order_id, 'Fetching taxpayer data from NAV', 'VAT number', $vat_number);
@@ -54,7 +49,7 @@ function get_taxpayer_data($order_id, $api_key, $vat_number) {
     }
 }
 
-function create_buyer_data($order, $current_order_id, $api_key, $vat_number = null) {
+function create_buyer_data($order, $current_order_id, $api_key, $vat_number, $billing_company_name) {
     $order_id = $order->id;
     
     $billing = $order->billing_address;
@@ -62,7 +57,7 @@ function create_buyer_data($order, $current_order_id, $api_key, $vat_number = nu
         return create_error($current_order_id, 'no_billing_address', "No billing address found for order " . absint($order_id));
     }
     
-    $buyer_name = $billing->name;
+    $buyer_name = $billing_company_name ?? $billing->name;
     $buyer_postcode = $billing->postcode;
     $buyer_city = $billing->city;
     $buyer_address = $billing->address_1 . ($billing->address_2 ? ' ' . $billing->address_2 : '');
@@ -233,15 +228,18 @@ function generate_invoice($order, $current_order_id) {
     if (empty($api_key)) {
         return create_error($current_order_id, 'api_error', 'API Key not configured.');
     }
+
+    $checkout_data = Cart::where('order_id', $order_id)->first()['checkout_data'];
+    $vat_number = $checkout_data['tax_data']['vat_number'] ?? null;
+    $billing_company_name = $checkout_data['form_data']['billing_company_name'] ?? null;
     
-    $vat_number = get_vat_number($order_id);
     if ($vat_number) {
         write_log($current_order_id, 'VAT number found', $vat_number);
     } else {
         write_log($current_order_id, 'No VAT number provided');
     }
     
-    $buyer_data = create_buyer_data($order, $current_order_id, $api_key, $vat_number);
+    $buyer_data = create_buyer_data($order, $current_order_id, $api_key, $vat_number, $billing_company_name);
     if (\is_wp_error($buyer_data)) {
         return $buyer_data;
     }
