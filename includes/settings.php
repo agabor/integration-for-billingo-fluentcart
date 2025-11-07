@@ -257,10 +257,6 @@ function settings_page() {
         return;
     }
     
-    if (isset($_GET['settings-updated'])) {
-        \add_settings_error('szamlazz_hu_messages', 'szamlazz_hu_message', \__('Settings Saved', 'integration-for-szamlazzhu-fluentcart'), 'updated');
-    }
-    
     \settings_errors('szamlazz_hu_messages');
     ?>
     <div class="wrap">
