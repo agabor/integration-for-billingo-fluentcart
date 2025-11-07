@@ -224,7 +224,7 @@ function generate_invoice_api($order_id, $api_key, $params) {
  * @return string XML string
  */
 function build_taxpayer_xml($api_key, $tax_number) {
-    $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><xmltaxpayer xmlns="http://www.szamlazz.hu/xmltaxpayer" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.szamlazz.hu/xmltaxpayer http://www.szamlazz.hu/szamla/docs/xsds/taxpayer/xmltaxpayer.xsd"></xmltaxpayer>');
+    $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><xmltaxpayer xmlns="http://www.szamlazz.hu/xmltaxpayer" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.szamlazz.hu/xmltaxpayer http://www.szamlazz.hu/docs/xsds/agent/xmltaxpayer.xsd"></xmltaxpayer>');
     
     $beallitasok = $xml->addChild('beallitasok');
     $beallitasok->addChild('szamlaagentkulcs', $api_key);
