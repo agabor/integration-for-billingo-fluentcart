@@ -365,16 +365,12 @@ function get_taxpayer_api($order_id, $api_key, $tax_number) {
  */
 function fetch_invoice_pdf($order_id, $api_key, $invoice_number) {
     // Build XML request for invoice PDF
-    $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><xmlszamlapdf xmlns="http://www.szamlazz.hu/xmlszamlapdf" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.szamlazz.hu/xmlszamlapdf http://www.szamlazz.hu/szamla/docs/xsds/agentpdf/xmlszamlapdf.xsd"></xmlszamlapdf>');
+    $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><xmlszamlapdf xmlns="http://www.szamlazz.hu/xmlszamlapdf" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.szamlazz.hu/xmlszamlapdf https://www.szamlazz.hu/szamla/docs/xsds/agentpdf/xmlszamlapdf.xsd"></xmlszamlapdf>');
     
-    // Add authentication
-    $beallitasok = $xml->addChild('beallitasok');
-    $beallitasok->addChild('szamlaagentkulcs', $api_key);
-    $beallitasok->addChild('szamlaLetoltes', 'true');
-    
-    // Add invoice number
-    $fejlec = $xml->addChild('fejlec');
-    $fejlec->addChild('szamlaszam', $invoice_number);
+    // Add authentication and request details
+    $xml->addChild('szamlaagentkulcs', $api_key);
+    $xml->addChild('szamlaszam', $invoice_number);
+    $xml->addChild('valaszVerzio', '2'); // XML response version
     
     $xml_string = $xml->asXML();
     
