@@ -177,3 +177,39 @@ msgstr "Szállítási áfa alkalmazása az összes adómértékre"
 #: integration-for-billingo-fluentcart.php
 msgid "API Settings"
 msgstr "API beállítások"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Document Block ID"
+msgstr "Számlatömb azonosító"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Optional: Enter your Billingo document block (invoice pad) ID. If left empty, the first available invoice block will be used automatically."
+msgstr "Opcionális: Add meg a Billingo számlatömb azonosítót. Ha üresen hagyod, az első elérhető számlatömb lesz automatikusan használva."
+
+#: integration-for-billingo-fluentcart.php
+msgid "Payment Method"
+msgstr "Fizetési mód"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Wire Transfer"
+msgstr "Átutalás"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Cash"
+msgstr "Készpénz"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Bank Card"
+msgstr "Bankkártya"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Check"
+msgstr "Csekk"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Cash on Delivery"
+msgstr "Utánvét"
+
+#: integration-for-billingo-fluentcart.php
+msgid "Other"
+msgstr "Egyéb"

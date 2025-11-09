@@ -173,3 +173,39 @@ msgstr ""
 #: integration-for-billingo-fluentcart.php
 msgid "API Settings"
 msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Document Block ID"
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Optional: Enter your Billingo document block (invoice pad) ID. If left empty, the first available invoice block will be used automatically."
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Payment Method"
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Wire Transfer"
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Cash"
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Bank Card"
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Check"
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Cash on Delivery"
+msgstr ""
+
+#: integration-for-billingo-fluentcart.php
+msgid "Other"
+msgstr ""
